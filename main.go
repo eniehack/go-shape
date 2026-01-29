@@ -23,23 +23,20 @@ const (
 	SHAPE_TYPE_MULTIPATCH  = 31
 )
 
-type BigHeader struct {
+type ShapeFileGlobalHeader struct {
 	MagicNumber int32
 	Zeros       [20]byte
 	FileLen     int32
 }
 
-type LittleHeader struct {
+type FileMetadataHeader struct {
 	Version   int32
 	ShapeType int32
-	XMin      float64
-	XMax      float64
-	YMin      float64
-	YMax      float64
-	ZMin      float64
-	ZMax      float64
-	MMin      float64
-	MMax      float64
+}
+
+type BBox struct {
+	Min float64
+	Max float64
 }
 
 func detectShapeType(shapeType int32) string {
@@ -87,17 +84,24 @@ func main() {
 		return
 	}
 	defer f.Close()
-	firstHeader := new(BigHeader)
-	secondHeader := new(LittleHeader)
-	binary.Read(f, binary.BigEndian, firstHeader)
-	binary.Read(f, binary.LittleEndian, secondHeader)
-	if firstHeader.MagicNumber != 9994 && secondHeader.Version != 1000 {
+	shapeFileGlobalHeader := new(ShapeFileGlobalHeader)
+	metadata := new(FileMetadataHeader)
+	xBBox := new(BBox)
+	yBBox := new(BBox)
+	zBBox := new(BBox)
+	mBBox := new(BBox)
+	binary.Read(f, binary.BigEndian, shapeFileGlobalHeader)
+	binary.Read(f, binary.LittleEndian, metadata)
+	for _, bbox := range []*BBox{xBBox, yBBox, zBBox, mBBox} {
+		binary.Read(f, binary.LittleEndian, bbox)
+	}
+	if shapeFileGlobalHeader.MagicNumber != 9994 && metadata.Version != 1000 {
 		fmt.Println("invalid")
 	}
-	fmt.Printf("file size: %dkb\n", firstHeader.FileLen/1024)
-	fmt.Printf("features type: %d(%s)\n", secondHeader.ShapeType, detectShapeType(secondHeader.ShapeType))
-	fmt.Printf("bbox(x axis): %f～%f\n", secondHeader.XMin, secondHeader.XMax)
-	fmt.Printf("bbox(y axis): %f～%f\n", secondHeader.YMin, secondHeader.YMax)
-	fmt.Printf("bbox(z axis): %f～%f\n", secondHeader.ZMin, secondHeader.ZMax)
-	fmt.Printf("bbox(m): %f～%f\n", secondHeader.MMin, secondHeader.MMax)
+	fmt.Printf("file size: %dkb\n", shapeFileGlobalHeader.FileLen/1024)
+	fmt.Printf("features type: %d(%s)\n", metadata.ShapeType, detectShapeType(metadata.ShapeType))
+	fmt.Printf("bbox(x axis): %f～%f\n", xBBox.Min, xBBox.Max)
+	fmt.Printf("bbox(y axis): %f～%f\n", yBBox.Min, yBBox.Max)
+	fmt.Printf("bbox(z axis): %f～%f\n", zBBox.Min, zBBox.Max)
+	fmt.Printf("bbox(m): %f～%f\n", mBBox.Min, mBBox.Max)
 }
