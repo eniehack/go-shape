@@ -7,6 +7,10 @@ import (
 )
 
 const (
+	// shapefileでは16bit = 2byte = 1wordである
+	BYTE_PER_WORD          = 2
+	SHAPEFILE_MAGICNUMBER  = 9994
+	SHAPEFILE_VERSION      = 1000
 	SHAPE_TYPE_NULL        = 0
 	SHAPE_TYPE_POINT       = 1
 	SHAPE_TYPE_POLYLINE    = 3
@@ -95,10 +99,10 @@ func main() {
 	for _, bbox := range []*BBox{xBBox, yBBox, zBBox, mBBox} {
 		binary.Read(f, binary.LittleEndian, bbox)
 	}
-	if shapeFileGlobalHeader.MagicNumber != 9994 && metadata.Version != 1000 {
+	if shapeFileGlobalHeader.MagicNumber != SHAPEFILE_MAGICNUMBER && metadata.Version != SHAPEFILE_VERSION {
 		fmt.Println("invalid")
 	}
-	fmt.Printf("file size: %dkb\n", shapeFileGlobalHeader.FileLen/1024)
+	fmt.Printf("file size: %dkb=%dmb\n", shapeFileGlobalHeader.FileLen*BYTE_PER_WORD/1024, shapeFileGlobalHeader.FileLen*BYTE_PER_WORD/(1024*1024)) // 単位はワード（1word=16bit）
 	fmt.Printf("features type: %d(%s)\n", metadata.ShapeType, detectShapeType(metadata.ShapeType))
 	fmt.Printf("bbox(x axis): %f～%f\n", xBBox.Min, xBBox.Max)
 	fmt.Printf("bbox(y axis): %f～%f\n", yBBox.Min, yBBox.Max)
