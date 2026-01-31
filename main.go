@@ -43,6 +43,18 @@ type BBox struct {
 	Max float64
 }
 
+type RecordHeader struct {
+	RecordNumber  int32
+	ContentLength int32
+}
+
+
+type Point struct {
+	ShapeType int32
+	X         float64
+	Y         float64
+}
+
 func detectShapeType(shapeType int32) string {
 	switch shapeType {
 	case SHAPE_TYPE_NULL:
@@ -78,6 +90,20 @@ func detectShapeType(shapeType int32) string {
 	}
 }
 
+func parsePoint(f io.Reader) (*Point, error) {
+	recordContent := new(Point)
+	if err := binary.Read(f, binary.LittleEndian, recordContent); errors.Is(err, io.ErrUnexpectedEOF) {
+		return recordContent, err
+	}
+	return recordContent, nil
+}
+
+func readContentHeader(f io.Reader) (*RecordHeader, error) {
+	recordHeader := new(RecordHeader)
+	err := binary.Read(f, binary.BigEndian, recordHeader)
+	return recordHeader, err
+}
+
 func main() {
 	if 2 < len(os.Args) {
 		return
@@ -108,4 +134,34 @@ func main() {
 	fmt.Printf("bbox(y axis): %f～%f\n", yBBox.Min, yBBox.Max)
 	fmt.Printf("bbox(z axis): %f～%f\n", zBBox.Min, zBBox.Max)
 	fmt.Printf("bbox(m): %f～%f\n", mBBox.Min, mBBox.Max)
+
+	allRecordLength := shapeFileGlobalHeader.FileLen*BYTE_PER_WORD - 25 // ヘッダを除いたファイル長（単位: bit）
+	fmt.Printf("%dbit = %dkbyte\n", allRecordLength, allRecordLength/(8*1024))
+	for i := int32(0); i < allRecordLength; {
+		var err error
+		recordHeader, err := readContentHeader(f)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				fmt.Printf("EOF")
+				break
+			} else if errors.Is(err, io.ErrUnexpectedEOF) {
+				fmt.Println("unexpected error", err)
+				return
+			}
+		}
+		i += (recordHeader.ContentLength + 4) * BYTE_PER_WORD
+		fmt.Println(allRecordLength, i, err)
+		switch metadata.ShapeType {
+		case SHAPE_TYPE_POINT:
+			point, err := parsePoint(f)
+			fmt.Println(recordHeader.RecordNumber, point, err)
+		default:
+			fmt.Println("UNKNOWN FEATURE")
+		}
+		if err != nil {
+			fmt.Println("unexpected error", err)
+			return
+		}
+	}
+
 }
